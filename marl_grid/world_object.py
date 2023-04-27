@@ -19,7 +19,7 @@ from marl_grid.rendering import (
 )
 
 if TYPE_CHECKING:
-    from marl_grid.minigrid_env import MiniGridEnv
+    from marl_grid.marlgrid_env import MiniGridEnv
 
 Point = Tuple[int, int]
 
