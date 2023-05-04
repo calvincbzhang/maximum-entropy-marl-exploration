@@ -45,9 +45,9 @@ class EmptyEnv(MARLGridEnv):
             self.agent_pos[a] = self.place_agent(a)
 
 
-class EmptyEnvTest(EmptyEnv):
+class EmptyEnv10x10x2(EmptyEnv):
     def __init__(self):
         super().__init__(
             size=10,
-            num_agents=5,
+            num_agents=2,
         )

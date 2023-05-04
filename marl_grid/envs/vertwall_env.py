@@ -8,7 +8,7 @@ from marl_grid.marlgrid_env import MARLGridEnv
 from marl_grid.actions import MiniActions
 
 
-class EmptyEnv(MARLGridEnv):
+class VertWallEnv(MARLGridEnv):
 
     def __init__(
         self, size, obstacle_type=Lava, max_steps: int | None = None, num_agents=1, **kwargs
@@ -52,19 +52,16 @@ class EmptyEnv(MARLGridEnv):
             )
         )
 
-        # # Place the obstacle wall
-        # self.grid.vert_wall(self.gap_pos[0], 1, height - 2, self.obstacle_type)
+        # Place the obstacle wall
+        self.grid.vert_wall(self.gap_pos[0], 1, height - 2, self.obstacle_type)
 
-        # # Put a hole in the wall
-        # self.grid.set(*self.gap_pos, None)
+        # Put a hole in the wall
+        self.grid.set(*self.gap_pos, None)
 
-        # for i in range(self.width - 6):
-        #     self.grid.set(3 + i, 1, Lava())
-        #     self.grid.set(3 + i, 5, Lava())
-
-class EmptyEnvTest(EmptyEnv):
+    
+class VertWallEnv10x10x2(VertWallEnv):
     def __init__(self):
         super().__init__(
-            size=50,
-            num_agents=15,
+            size=10,
+            num_agents=2,
         )

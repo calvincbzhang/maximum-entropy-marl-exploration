@@ -1,1 +1,2 @@
-from marl_grid.envs.empty_env import EmptyEnvTest
+from marl_grid.envs.empty_env import EmptyEnv10x10x2
+from marl_grid.envs.vertwall_env import VertWallEnv10x10x2

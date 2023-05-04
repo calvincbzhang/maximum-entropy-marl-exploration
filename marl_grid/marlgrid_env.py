@@ -377,7 +377,6 @@ class MARLGridEnv(gym.Env):
 
             # Get the position in the cell the agent will be after executing the action
             fwd_pos = self.agent_pos[i] \
-                + (action[i] == self.actions.nothing) * np.array([0, 0]) \
                 + (action[i] == self.actions.up) * np.array([0, -1]) \
                 + (action[i] == self.actions.down) * np.array([0, 1]) \
                 + (action[i] == self.actions.left) * np.array([-1, 0]) \

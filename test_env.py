@@ -6,7 +6,7 @@ import argparse
 def main():
     register(
         id='empty-v0',
-        entry_point='marl_grid.envs:EmptyEnvTest',
+        entry_point='marl_grid.envs:VertWallEnv10x10x2',
     )
     env = gym.make('empty-v0')
 
