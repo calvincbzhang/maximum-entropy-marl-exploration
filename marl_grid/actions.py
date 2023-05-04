@@ -4,16 +4,27 @@ from enum import IntEnum
 
 
 class Actions(IntEnum):
-    # Turn left, turn right, move forward
-    left = 0
-    right = 1
-    forward = 2
-    # Pick up an object
-    pickup = 3
+    # Go up, down, right, left or do nothing
+    nothing = 0
+    up = 1
+    down = 2
+    right = 3
+    left = 4
+    # Pick up a object
+    pickup = 5
     # Drop an object
-    drop = 4
+    drop = 6
     # Toggle/activate an object
-    toggle = 5
+    toggle = 7
 
     # Done completing task
-    done = 6
+    done = 8
+
+
+class MiniActions(IntEnum):
+    # Go up, down, right, left or do nothing
+    nothing = 0
+    up = 1
+    down = 2
+    right = 3
+    left = 4

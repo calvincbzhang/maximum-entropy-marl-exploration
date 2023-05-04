@@ -13,6 +13,7 @@ from marl_grid.rendering import (
     highlight_img,
     point_in_rect,
     point_in_triangle,
+    point_in_circle,
     rotate_fn,
 )
 
@@ -106,6 +107,7 @@ class Grid:
         self.horz_wall(x, y + h - 1, w)
         self.vert_wall(x, y, h)
         self.vert_wall(x + w - 1, y, h)
+        
 
     def rotate_left(self) -> Grid:
         """
@@ -146,7 +148,7 @@ class Grid:
     def render_tile(
         cls,
         obj: WorldObj | None,
-        agent_dir: int | None = None,
+        agent_here: bool = False,
         highlight: bool = False,
         tile_size: int = TILE_PIXELS,
         subdivs: int = 3,
@@ -156,7 +158,7 @@ class Grid:
         """
 
         # Hash map lookup key for the cache
-        key: tuple[Any, ...] = (agent_dir, highlight, tile_size)
+        key: tuple[Any, ...] = (agent_here, highlight, tile_size)
         key = obj.encode() + key if obj else key
 
         if key in cls.tile_cache:
@@ -174,16 +176,9 @@ class Grid:
             obj.render(img)
 
         # Overlay the agent on top
-        if agent_dir is not None:
-            tri_fn = point_in_triangle(
-                (0.12, 0.19),
-                (0.87, 0.50),
-                (0.12, 0.81),
-            )
-
-            # Rotate the agent based on its direction
-            tri_fn = rotate_fn(tri_fn, cx=0.5, cy=0.5, theta=0.5 * math.pi * agent_dir)
-            fill_coords(img, tri_fn, (255, 0, 0))
+        if agent_here:
+            circ_fn = point_in_circle(cx=0.5, cy=0.5, r=0.45)
+            fill_coords(img, circ_fn, (255, 0, 0))
 
         # Highlight the cell if needed
         if highlight:
@@ -200,8 +195,7 @@ class Grid:
     def render(
         self,
         tile_size: int,
-        agent_pos: tuple[int, int],
-        agent_dir: int | None = None,
+        agent_pos,
         highlight_mask: np.ndarray | None = None,
     ) -> np.ndarray:
         """
@@ -223,21 +217,23 @@ class Grid:
         for j in range(0, self.height):
             for i in range(0, self.width):
                 cell = self.get(i, j)
-
-                agent_here = np.array_equal(agent_pos, (i, j))
-                assert highlight_mask is not None
-                tile_img = Grid.render_tile(
-                    cell,
-                    agent_dir=agent_dir if agent_here else None,
-                    highlight=highlight_mask[i, j],
-                    tile_size=tile_size,
-                )
+                tile_img = []
+                for a in range(len(agent_pos)):
+                    agent_here = np.array_equal(agent_pos[a], (i, j))
+                    assert highlight_mask is not None
+                    tile_img.append(Grid.render_tile(
+                        cell,
+                        agent_here,
+                        highlight=highlight_mask[i, j],
+                        tile_size=tile_size,
+                    ))
+                tile_image = np.max(tile_img, axis=0)
 
                 ymin = j * tile_size
                 ymax = (j + 1) * tile_size
                 xmin = i * tile_size
                 xmax = (i + 1) * tile_size
-                img[ymin:ymax, xmin:xmax, :] = tile_img
+                img[ymin:ymax, xmin:xmax, :] = tile_image
 
         return img
 

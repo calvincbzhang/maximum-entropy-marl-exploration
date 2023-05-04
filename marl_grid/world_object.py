@@ -97,6 +97,8 @@ class WorldObj:
             v = Goal()
         elif obj_type == "lava":
             v = Lava()
+        elif obj_type == "agent":
+            v = Agent()
         else:
             assert False, "unknown object type in decode '%s'" % obj_type
 
@@ -105,6 +107,17 @@ class WorldObj:
     def render(self, r: np.ndarray) -> np.ndarray:
         """Draw this object with the given renderer"""
         raise NotImplementedError
+    
+
+class Agent(WorldObj):
+    def __init__(self):
+        super().__init__("agent", "red")
+
+    def can_overlap(self):
+        return True
+
+    def render(self, img):
+        fill_coords(img, point_in_circle(cx=0.5, cy=0.5, r=0.45), COLORS[self.color])
 
 
 class Goal(WorldObj):

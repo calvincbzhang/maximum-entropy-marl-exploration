@@ -44,10 +44,27 @@ class EmptyEnv(MARLGridEnv):
         for a in range(self.num_agents):
             self.agent_pos[a] = self.place_agent(a)
 
+        # Generate and store random gap position
+        self.gap_pos = np.array(
+            (
+                self._rand_int(2, width - 2),
+                self._rand_int(1, height - 1),
+            )
+        )
+
+        # # Place the obstacle wall
+        # self.grid.vert_wall(self.gap_pos[0], 1, height - 2, self.obstacle_type)
+
+        # # Put a hole in the wall
+        # self.grid.set(*self.gap_pos, None)
+
+        # for i in range(self.width - 6):
+        #     self.grid.set(3 + i, 1, Lava())
+        #     self.grid.set(3 + i, 5, Lava())
 
 class EmptyEnvTest(EmptyEnv):
     def __init__(self):
         super().__init__(
-            size=10,
-            num_agents=5,
+            size=50,
+            num_agents=15,
         )

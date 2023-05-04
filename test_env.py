@@ -10,13 +10,15 @@ def main():
     )
     env = gym.make('empty-v0')
 
+    num_agents = env.num_agents
+
     _ = env.reset()
 
     while True:
         env.render()
-        time.sleep(0.1)
+        time.sleep(0.3)
 
-        ac = env.action_space.sample()
+        ac = [env.action_space.sample() for _ in range(num_agents)]
 
         obs, reward, terminated, truncated, info = env.step(ac)
 
