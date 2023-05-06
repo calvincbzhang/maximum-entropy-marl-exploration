@@ -68,11 +68,11 @@ class MARLGridEnv(gym.Env):
         assert agent_view_size >= 3
         self.agent_view_size = agent_view_size
 
-        # Observations are dictionaries containing an encoding of the grid
-        self.observation_space = spaces.Box(
-            low=0,
-            high=255,
-            shape=(width, height, 3),
+        sample_obs = []
+        for i in range(len(self.agents)):
+            sample_obs.append([width, height])
+        self.observation_space = spaces.MultiDiscrete(
+            nvec=(sample_obs),
             dtype="uint8",
         )
 
@@ -116,9 +116,12 @@ class MARLGridEnv(gym.Env):
         # Generate a new random grid at the start of each episode
         self._gen_grid(self.width, self.height)
 
+        obs = np.empty((len(self.agents), 2), dtype=np.uint8)
+
         # These fields should be defined by _gen_grid
         for a in self.agents:
             assert self.agent_pos[a] is not None
+            obs[a] = self.agent_pos[a]
 
         # Item picked up, being carried, initially nothing
         for a in self.agents:
@@ -131,7 +134,7 @@ class MARLGridEnv(gym.Env):
             self.render()
 
         # Return first observation
-        obs = self.gen_obs()
+        # obs = self.gen_obs()
 
         return obs, {}
 
@@ -358,8 +361,6 @@ class MARLGridEnv(gym.Env):
         pos = self.place_obj(Agent(), top, size, max_tries=max_tries)
         self.agent_pos[agent] = pos
 
-        # print(self.grid.get(*pos).type)
-
         return pos
 
     def step(
@@ -373,6 +374,8 @@ class MARLGridEnv(gym.Env):
         terminated = False
         truncated = False
 
+        obs = np.empty((len(action), 2), dtype=np.uint8)
+
         for i in order:
 
             # Get the position in the cell the agent will be after executing the action
@@ -384,6 +387,8 @@ class MARLGridEnv(gym.Env):
 
             # Get the contents of the cell in front of the agent
             fwd_cell = self.grid.get(*fwd_pos)
+
+            obs[i] = fwd_pos
 
             if action[i] == self.actions.nothing:
                 pass
@@ -397,10 +402,10 @@ class MARLGridEnv(gym.Env):
                     terminated = True
                     reward[i] = self._reward()
                 if fwd_cell is not None and (fwd_cell.type == "lava" or fwd_cell.type == "agent"):
-                    if fwd_cell.type == "agent":
-                        print("Agent collision")
-                    elif fwd_cell.type == "lava":
-                        print("Lava collision")
+                    # if fwd_cell.type == "agent":
+                    #     print("Agent collision")
+                    # elif fwd_cell.type == "lava":
+                    #     print("Lava collision")
                     terminated = True
 
             elif len(self.actions) > 5:
@@ -437,7 +442,7 @@ class MARLGridEnv(gym.Env):
         if self.render_mode == "human":
             self.render()
 
-        obs = self.gen_obs()
+        # obs = self.gen_obs()
 
         reward = np.mean(reward)
 
@@ -447,7 +452,8 @@ class MARLGridEnv(gym.Env):
         """
         Generate the agent's view (fully observable)
         """
-        # Encode the partially observable view into a numpy array
+        obs = []
+        # Encode the view into a numpy array
         return self.grid.encode()
 
     def get_full_render(self, highlight, tile_size):

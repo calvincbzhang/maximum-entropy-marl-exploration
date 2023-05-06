@@ -40,10 +40,6 @@ class VertWallEnv(MARLGridEnv):
         # Generate the surrounding walls
         self.grid.wall_rect(0, 0, width, height)
 
-        # Place the agents
-        for a in range(self.num_agents):
-            self.agent_pos[a] = self.place_agent(a)
-
         # Generate and store random gap position
         self.gap_pos = np.array(
             (
@@ -57,6 +53,10 @@ class VertWallEnv(MARLGridEnv):
 
         # Put a hole in the wall
         self.grid.set(*self.gap_pos, None)
+
+        # Place the agents
+        for a in range(self.num_agents):
+            self.agent_pos[a] = self.place_agent(a)
 
     
 class VertWallEnv10x10x2(VertWallEnv):
