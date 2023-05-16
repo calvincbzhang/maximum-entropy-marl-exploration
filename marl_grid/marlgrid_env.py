@@ -17,6 +17,8 @@ from marl_grid.constants import COLOR_NAMES, TILE_PIXELS
 from marl_grid.grid import Grid
 from marl_grid.world_object import Point, WorldObj, Agent
 
+from PIL import Image
+
 T = TypeVar("T")
 
 
