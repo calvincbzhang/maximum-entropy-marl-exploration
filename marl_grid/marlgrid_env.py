@@ -403,12 +403,10 @@ class MARLGridEnv(gym.Env):
                 if fwd_cell is not None and fwd_cell.type == "goal":
                     terminated = True
                     reward[i] = self._reward()
-                if fwd_cell is not None and (fwd_cell.type == "lava" or fwd_cell.type == "agent"):
-                    # if fwd_cell.type == "agent":
-                    #     print("Agent collision")
-                    # elif fwd_cell.type == "lava":
-                    #     print("Lava collision")
+                if fwd_cell is not None and fwd_cell.type == "lava":
                     terminated = True
+                if fwd_cell is not None and (fwd_cell.type == "wall" or fwd_cell.type == "agent"):
+                    obs[i] = self.agent_pos[i]
 
             elif len(self.actions) > 5:
                 # Pick up an object

@@ -7,6 +7,8 @@ from marl_grid.world_object import Lava
 from marl_grid.marlgrid_env import MARLGridEnv
 from marl_grid.actions import MiniActions
 
+import random
+
 
 class RoomsEnv(MARLGridEnv):
 
@@ -40,30 +42,37 @@ class RoomsEnv(MARLGridEnv):
         # Generate the surrounding walls
         self.grid.wall_rect(0, 0, width, height)
 
-        room_w = width // 2
-        room_h = height // 2
+        roomW = width // 3
+        roomH = height // 3
 
         # For each row of rooms
-        for j in range(0, 2):
+        for j in range(0, 3):
 
             # For each column
-            for i in range(0, 2):
-                xL = i * room_w
-                yT = j * room_h
-                xR = xL + room_w
-                yB = yT + room_h
+            for i in range(0, 3):
+                xL = i * roomW
+                yT = j * roomH
+                xR = xL + roomW
+                yB = yT + roomH
 
                 # Bottom wall and door
-                if i + 1 < 2:
-                    self.grid.vert_wall(xR, yT, room_h)
-                    pos = (xR, self._rand_int(yT + 1, yB))
+                if i + 1 < 3:
+                    self.grid.vert_wall(xR, yT, roomH)
+                    pos = (xR, self._rand_int(yT + 1, yB - 1))
                     self.grid.set(*pos, None)
 
                 # Bottom wall and door
-                if j + 1 < 2:
-                    self.grid.horz_wall(xL, yB, room_w)
-                    pos = (self._rand_int(xL + 1, xR), yB)
+                if j + 1 < 3:
+                    self.grid.horz_wall(xL, yB, roomW)
+                    pos = (self._rand_int(xL + 1, xR - 1), yB)
                     self.grid.set(*pos, None)
+
+        # Place the lava walls
+        for i in range(1, width-1, 2):
+            for j in range(1, height-1, 2):
+                if random.random() < 0.2:  # Adjust the lava percentage as desired
+                    self.grid.set(i, j, Lava())
+                    self.grid.set(i, j, Lava())
 
         # Place the agents
         for a in range(self.num_agents):
