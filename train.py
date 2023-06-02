@@ -54,7 +54,7 @@ def main(args):
 
     env = gym.make("GridWorld-v0", size = args.size, num_agents = args.num_agents)
 
-    agents = [Policy(env.observation_space.shape[1], env.action_space.n) for _ in range(num_agents)]
+    agents = [SoftMaxPolicy(env.observation_space.shape[1], env.action_space.n) for _ in range(num_agents)]
 
     optimizers = [optim.Adam(params=agent.parameters(), lr=args.lr) for agent in agents]
 
@@ -64,6 +64,10 @@ def main(args):
             param.requires_grad = True  # Enable gradient computation
 
     for k in range(args.num_episodes):
+
+        print(f"==================== Episode {k} ====================")
+
+        env.set_render_mode("human")
 
         trajectories = []
         occupancies = np.zeros((args.size, args.size))
@@ -78,8 +82,9 @@ def main(args):
 
                 trajectory.append(obs)
 
-                actions = [agents[i](torch.tensor(obs[i], dtype=torch.float32)).argmax().item() for i in range(num_agents)]
-                # actions = [env.action_space.sample() for _ in range(num_agents)]
+                probs = [agents[i](torch.tensor(obs[i], dtype=torch.float32)) for i in range(num_agents)]
+                samplers = [torch.distributions.Categorical(probs[i]) for i in range(num_agents)]
+                actions = [samplers[i].sample().item() for i in range(num_agents)]
 
                 obs, _, _, _, _ = env.step(actions)
 
@@ -104,21 +109,71 @@ def main(args):
         print(f"Entropy: {entropy}")
 
         # Reward function for every state (for every state -(log(occu(s))) + 1)
-        reward_fn = - (torch.log(occupancies) + 1) # keep logs at inf since these are unexplored states?
+        reward_fn = - (torch.log(occupancies) + 1)
+        # Set infinities to a large number
+        reward_fn[torch.isinf(reward_fn)] = 10
+        # Zero out the borders
+        reward_fn[0, :] = 0
+        reward_fn[-1, :] = 0
+        reward_fn[:, 0] = 0
+        reward_fn[:, -1] = 0
+        # print(f"Occupancies: {occupancies}")
+        # print(f"Reward function: {reward_fn}")
 
-        # print(reward_fn)
+        # So far, we have estimated a reward function
+        # Now, we need to use this reward function to implement a policy gradient algorithm
 
-        for trajectory in trajectories:
-            for state, action in zip(trajectory[::2], trajectory[1::2]):
-                for agent in range(num_agents):
-                    reward = reward_fn[state[agent][0], state[agent][1]]
-                    probs = agents[agent](torch.tensor(state[agent], dtype=torch.float32))
-                    sampler = torch.distributions.Categorical(probs)
-                    log_probs = -sampler.log_prob(torch.tensor(action[agent], dtype=torch.float32))
-                    loss = torch.sum(log_probs * reward)
-                    loss.backward(retain_graph=True)
-                    optimizers[agent].zero_grad()
-                    optimizers[agent].step()
+        print("==================== Running policy gradient ====================")
+
+        env.set_render_mode("rgb_array")
+
+        for _ in range(10):
+
+            rewards = []
+            actions = []
+            states = []
+
+            obs, _ = env.reset()
+
+            gamma = 0.99
+
+            for _ in range(args.horizon):
+
+                probs = [agents[i](torch.tensor(obs[i], dtype=torch.float32)) for i in range(num_agents)]
+                samplers = [torch.distributions.Categorical(probs[i]) for i in range(num_agents)]
+                action = [samplers[i].sample().item() for i in range(num_agents)]
+
+                new_obs, _, _, _, _ = env.step(action)
+
+                states.append(obs)
+                actions.append(action)
+                rewards.append([reward_fn[obs[i][0], obs[i][1]] for i in range(num_agents)])
+
+                obs = new_obs
+
+            rewards = torch.tensor(rewards, dtype=torch.float32)
+            # Compute rewards-to-go
+            R = torch.zeros_like(rewards)  # Initialize R with zeros
+
+            for agent in range(num_agents):
+                for i in range(rewards.size(0)):
+                    R[i, agent] = torch.sum(rewards[i:, agent] * (gamma ** torch.arange(i, rewards.size(0))))
+
+            states = torch.tensor(np.array(states), dtype=torch.float32)
+            actions = torch.tensor(np.array(actions))
+
+            probs = [agents[i](states[:, i, :]) for i in range(num_agents)]
+            samplers = [torch.distributions.Categorical(probs[i]) for i in range(num_agents)]
+            log_probs = [-samplers[i].log_prob(actions[:, i]) for i in range(num_agents)]
+            losses = [torch.sum(log_probs[i] * R[:, i]) for i in range(num_agents)]
+
+            for i in range(num_agents):
+                optimizers[i].zero_grad()
+                losses[i].backward()
+                optimizers[i].step()
+
+            print(f"Losses: {losses}")
+
 
 if __name__ == "__main__":
 

@@ -26,7 +26,7 @@ class EmptyEnv(MARLGridEnv):
             num_agents=num_agents,
             see_through_walls=False,
             max_steps=max_steps,
-            # render_mode='human',
+            render_mode='human',
             actions = MiniActions,
             **kwargs,
         )

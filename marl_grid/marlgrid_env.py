@@ -29,7 +29,7 @@ class MARLGridEnv(gym.Env):
 
     metadata = {
         "render_modes": ["human", "rgb_array"],
-        "render_fps": 10,
+        "render_fps": 15,
     }
 
     def __init__(
@@ -57,7 +57,7 @@ class MARLGridEnv(gym.Env):
             width = grid_size
             height = grid_size
         assert width is not None and height is not None
-        assert width >= 2 * num_agents and height >= 2 * num_agents
+        # assert width >= 2 * num_agents and height >= 2 * num_agents
 
         # Action enumeration for this environment
         self.actions = actions
@@ -106,6 +106,13 @@ class MARLGridEnv(gym.Env):
         self.highlight = highlight
         self.tile_size = tile_size
         # self.agent_pov = agent_pov
+
+    def set_render_mode(self, mode: str):
+        """
+        Set the desired rendering mode
+        """
+        assert mode in self.metadata["render_modes"]
+        self.render_mode = mode
 
     def reset(
         self,
@@ -405,7 +412,7 @@ class MARLGridEnv(gym.Env):
                     reward[i] = self._reward()
                 if fwd_cell is not None and fwd_cell.type == "lava":
                     terminated = True
-                if fwd_cell is not None and (fwd_cell.type == "wall" or fwd_cell.type == "agent"):
+                if fwd_cell is not None and (fwd_cell.type == "wall"):
                     obs[i] = self.agent_pos[i]
 
             elif len(self.actions) > 5:
