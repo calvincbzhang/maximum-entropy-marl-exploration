@@ -54,7 +54,7 @@ def main(args):
 
     env = gym.make("GridWorld-v0", size = args.size, num_agents = args.num_agents)
 
-    agents = [SoftMaxPolicy(env.observation_space.shape[1], env.action_space.n) for _ in range(num_agents)]
+    agents = [Policy(env.observation_space.shape[1], env.action_space.n) for _ in range(num_agents)]
 
     optimizers = [optim.Adam(params=agent.parameters(), lr=args.lr) for agent in agents]
 
@@ -67,7 +67,7 @@ def main(args):
 
         print(f"==================== Episode {k} ====================")
 
-        env.set_render_mode("human")
+        env.set_render_mode("rgb_array")
 
         trajectories = []
         occupancies = np.zeros((args.size, args.size))
@@ -173,6 +173,23 @@ def main(args):
                 optimizers[i].step()
 
             print(f"Losses: {losses}")
+
+        # Test the policy
+
+        print("==================== Testing the policy ====================")
+
+        env.set_render_mode("human")
+
+        obs, _ = env.reset()
+
+        for _ in range(args.horizon):
+
+            probs = [agents[i](torch.tensor(obs[i], dtype=torch.float32)) for i in range(num_agents)]
+            samplers = [torch.distributions.Categorical(probs[i]) for i in range(num_agents)]
+            actions = [samplers[i].sample().item() for i in range(num_agents)]
+
+            obs, _, _, _, _ = env.step(actions)
+
 
 
 if __name__ == "__main__":
