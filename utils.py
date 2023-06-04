@@ -71,7 +71,7 @@ def heatmap(running_avg_p, avg_p, running_avg_p_baseline, p_baseline, e, folder_
     cbar4 = axs[1, 1].figure.colorbar(axs[1, 1].imshow(p_baseline, interpolation="nearest"), ax=axs[1, 1])
 
     # Log image to wandb
-    wandb.log({"heatmap": [wandb.Image(fig, caption=f"Episode {e}")]})
+    wandb.log({"Probability Distributions": [wandb.Image(fig, caption=f"Episode {e}")]})
 
     for ax in axs.flat:
         ax.set(xlabel="x", ylabel="y")
