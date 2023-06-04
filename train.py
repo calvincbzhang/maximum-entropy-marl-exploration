@@ -1,210 +1,165 @@
 import gymnasium as gym
 from gymnasium.envs.registration import register
 
-import time
+import numpy as np
 import argparse
 
-import numpy as np
-
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
+import os
+
+import scipy
+
+from policies import Policy
+from utils import *
+
+import logging
+import datetime
+import yaml
+
+import wandb
 
 
-class SoftMaxPolicy(nn.Module):
-    """
-    Simple policy with softmax parametrization
-    """
+def main(config, folder_name):
 
-    def __init__(self, input_size, output_size):
-        super(SoftMaxPolicy, self).__init__()
+    env_name = config["env_name"] + "Env"
+    size = config["size"]
+    num_agents = config["num_agents"]
 
-        self.linear = nn.Linear(input_size, output_size)
-
-    def forward(self, x):
-        x = self.linear(x)
-        return F.softmax(x, dim=-1)
-    
-
-# Simple neural network policy with 3 hidden layers and relu activations
-class Policy(nn.Module):
-    def __init__(self, input_size, output_size):
-        super(Policy, self).__init__()
-
-        self.linear1 = nn.Linear(input_size, 64)
-        self.linear2 = nn.Linear(64, 64)
-        self.linear3 = nn.Linear(64, output_size)
-
-    def forward(self, x):
-        x = F.relu(self.linear1(x))
-        x = F.relu(self.linear2(x))
-        return F.softmax(self.linear3(x), dim=-1)
-
-
-def main(args):
-
-    env_name = args.env_name + "Env"
-    num_agents = args.num_agents
+    num_episodes = config["num_episodes"]
+    train_steps = config["train_steps"]
+    horizon = config["horizon"]
+    gamma = config["gamma"]
+    lr = config["lr"]
 
     register(
         id='GridWorld-v0',
         entry_point='marl_grid.envs:' + env_name
     )
 
-    env = gym.make("GridWorld-v0", size = args.size, num_agents = args.num_agents)
+    # Print and log environment information
+    print(f"======== Running {env_name} with size {size} and {num_agents} agents ========")
+    logging.info(f"======== Running {env_name} with size {size} and {num_agents} agents ========")
+    # Print and log hyperparameters
+    print(f"Parameters: num_episodes={num_episodes}, horizon={horizon}, gamma={gamma}, lr={lr}")
+    logging.info(f"Parameters: num_episodes={num_episodes}, horizon={horizon}, gamma={gamma}, lr={lr}")
 
-    agents = [Policy(env.observation_space.shape[1], env.action_space.n) for _ in range(num_agents)]
+    env = gym.make("GridWorld-v0", size=size, num_agents=num_agents)
 
-    optimizers = [optim.Adam(params=agent.parameters(), lr=args.lr) for agent in agents]
+    reward_fn = np.zeros(shape=(size, size))
 
-    for agent in agents:
-        agent.train()  # Set the agent to training mode
-        for param in agent.parameters():
-            param.requires_grad = True  # Enable gradient computation
+    running_avg_p = np.zeros(shape=(size, size))
+    running_avg_ent = 0
+    running_avg_entropies = []
+    running_avg_ps = []
 
-    for k in range(args.num_episodes):
+    running_avg_p_baseline = np.zeros(shape=(size, size))
+    running_avg_ent_baseline = 0
+    running_avg_entropies_baseline = []
+    running_avg_ps_baseline = []
+    
+    policies = []
 
-        print(f"==================== Episode {k} ====================")
-
-        env.set_render_mode("rgb_array")
-
-        trajectories = []
-        occupancies = np.zeros((args.size, args.size))
-
-        # Collect a batch of trajectories with the current policy
-        for _ in range(args.batch_size):
-
-            obs, _ = env.reset()
-            trajectory = []
-
-            for _ in range(args.horizon):
-
-                trajectory.append(obs)
-
-                probs = [agents[i](torch.tensor(obs[i], dtype=torch.float32)) for i in range(num_agents)]
-                samplers = [torch.distributions.Categorical(probs[i]) for i in range(num_agents)]
-                actions = [samplers[i].sample().item() for i in range(num_agents)]
-
-                obs, _, _, _, _ = env.step(actions)
-
-                trajectory.append(actions)
-
-            trajectories.append(trajectory)
-
-        # Compute the occupancy measure
-        for trajectory in trajectories:
-            for state in trajectory[::2]:
-                for agent in range(num_agents):
-                    occupancies[state[agent][0], state[agent][1]] += 1
-
-        # Normalize the occupancy measure
-        occupancies = occupancies / (args.batch_size * args.horizon * args.num_agents)
-
-        # Convert the occupancy measure to a tensor
-        occupancies = torch.tensor(occupancies, dtype=torch.float32, requires_grad=True)
-
-        # Compute the entropy
-        entropy = -torch.nansum(occupancies * torch.log(occupancies))
-        print(f"Entropy: {entropy}")
-
-        # Reward function for every state (for every state -(log(occu(s))) + 1)
-        reward_fn = - (torch.log(occupancies) + 1)
-        # Set infinities to a large number
-        reward_fn[torch.isinf(reward_fn)] = 10
-        # Zero out the borders
-        reward_fn[0, :] = 0
-        reward_fn[-1, :] = 0
-        reward_fn[:, 0] = 0
-        reward_fn[:, -1] = 0
-        # print(f"Occupancies: {occupancies}")
-        # print(f"Reward function: {reward_fn}")
-
-        # So far, we have estimated a reward function
-        # Now, we need to use this reward function to implement a policy gradient algorithm
-
-        print("==================== Running policy gradient ====================")
+    for e in range(num_episodes):
 
         env.set_render_mode("rgb_array")
 
-        for _ in range(10):
+        print(f"======== Episode {e}/{num_episodes} ========")
+        logging.info(f"======== Episode {e}/{num_episodes} ========")
 
-            rewards = []
-            actions = []
-            states = []
+        policy = [Policy(env.observation_space.shape[1], env.action_space.n) for _ in range(num_agents)]
+        optimizers = [torch.optim.Adam(policy[i].parameters(), lr=lr) for i in range(num_agents)]
 
-            obs, _ = env.reset()
+        if e != 0:
+            policy = learn_policy(env, train_steps, horizon, policy, reward_fn, optimizers, gamma)
 
-            gamma = 0.99
+        policies.append(policy)
 
-            for _ in range(args.horizon):
+        # Execute the random policy and estimate the entropy
+        a = 2 # average over this many rounds
+        p_baseline = execute_random(env, horizon)
+        avg_entropy_baseline = scipy.stats.entropy(p_baseline.flatten())
+        for av in range(a-1):
+            next_p_baseline = execute_random(env, horizon)
+            p_baseline += next_p_baseline
+            avg_entropy_baseline += scipy.stats.entropy(next_p_baseline.flatten())
+        p_baseline /= float(a)
+        avg_entropy_baseline /= float(a)
 
-                probs = [agents[i](torch.tensor(obs[i], dtype=torch.float32)) for i in range(num_agents)]
-                samplers = [torch.distributions.Categorical(probs[i]) for i in range(num_agents)]
-                action = [samplers[i].sample().item() for i in range(num_agents)]
+        # Execute the average policy so far and estimate the entropy
+        average_p, avg_entropy = execute_average_policy(env, horizon, policies)
 
-                new_obs, _, _, _, _ = env.step(action)
+        # Get next distribtuion p
+        p = execute(env, horizon, policy)
 
-                states.append(obs)
-                actions.append(action)
-                rewards.append([reward_fn[obs[i][0], obs[i][1]] for i in range(num_agents)])
+        # Force first round to be equal
+        if e == 0:
+            average_p = p_baseline
+            avg_entropy = avg_entropy_baseline
 
-                obs = new_obs
+        # Get the reward function
+        reward_fn = grad_ent(average_p)
 
-            rewards = torch.tensor(rewards, dtype=torch.float32)
-            # Compute rewards-to-go
-            R = torch.zeros_like(rewards)  # Initialize R with zeros
+        # Update experimental running averages.
+        running_avg_ent = running_avg_ent * (e)/float(e+1) + avg_entropy/float(e+1)
+        running_avg_p = running_avg_p * (e)/float(e+1) + average_p/float(e+1)
+        running_avg_entropies.append(running_avg_ent)
+        running_avg_ps.append(running_avg_p)
 
-            for agent in range(num_agents):
-                for i in range(rewards.size(0)):
-                    R[i, agent] = torch.sum(rewards[i:, agent] * (gamma ** torch.arange(i, rewards.size(0))))
+        # Update baseline running averages.
+        running_avg_ent_baseline = running_avg_ent_baseline * (e)/float(e+1) + avg_entropy_baseline/float(e+1)
+        running_avg_p_baseline = running_avg_p_baseline * (e)/float(e+1) + p_baseline/float(e+1)
+        running_avg_entropies_baseline.append(running_avg_ent_baseline)
+        running_avg_ps_baseline.append(running_avg_p_baseline)
 
-            states = torch.tensor(np.array(states), dtype=torch.float32)
-            actions = torch.tensor(np.array(actions))
+        # Log to wandb
+        wandb.log({"Average Entropy": avg_entropy, "Running Average Entropy": running_avg_ent, "Average Entropy Baseline": avg_entropy_baseline, "Running Average Entropy Baseline": running_avg_ent_baseline})
 
-            probs = [agents[i](states[:, i, :]) for i in range(num_agents)]
-            samplers = [torch.distributions.Categorical(probs[i]) for i in range(num_agents)]
-            log_probs = [-samplers[i].log_prob(actions[:, i]) for i in range(num_agents)]
-            losses = [torch.sum(log_probs[i] * R[:, i]) for i in range(num_agents)]
+        # Print and log results
+        print("=========== p ===========")
+        print(p)
+        print("=========== average_p ===========")
+        print(average_p)
 
-            for i in range(num_agents):
-                optimizers[i].zero_grad()
-                losses[i].backward()
-                optimizers[i].step()
+        logging.info("=========== p ===========")
+        logging.info(p)
+        logging.info("=========== average_p ===========")
+        logging.info(average_p)
 
-            print(f"Losses: {losses}")
+        print("========================")
+        logging.info("========================")
 
-        # Test the policy
+        # Print round average entropy, running average entropy, round entropy baseline, running average entropy baseline
+        print(f"Round Average Entropy[{e}] = {avg_entropy} \t Running Average Entropy = {running_avg_ent}")
+        print(f"Round Entropy Baseline[{e}] = {avg_entropy_baseline} \t Running Average Entropy Baseline = {running_avg_ent_baseline}")
 
-        print("==================== Testing the policy ====================")
+        logging.info(f"Round Average Entropy[{e}] = {avg_entropy} \t Running Average Entropy = {running_avg_ent}")
+        logging.info(f"Round Entropy Baseline[{e}] = {avg_entropy_baseline} \t Running Average Entropy Baseline = {running_avg_ent_baseline}")
 
-        env.set_render_mode("human")
+        print("\n")
+        logging.info("\n")
 
-        obs, _ = env.reset()
-
-        for _ in range(args.horizon):
-
-            probs = [agents[i](torch.tensor(obs[i], dtype=torch.float32)) for i in range(num_agents)]
-            samplers = [torch.distributions.Categorical(probs[i]) for i in range(num_agents)]
-            actions = [samplers[i].sample().item() for i in range(num_agents)]
-
-            obs, _, _, _, _ = env.step(actions)
-
+        heatmap(running_avg_p, average_p, e, folder_name)
 
 
 if __name__ == "__main__":
 
+    # parse arguments
     parser = argparse.ArgumentParser()
-
-    parser.add_argument("--env_name", type=str, default="Empty", help="Name of the environment")
-    parser.add_argument("--size", type=int, default=10, help="Size of the gridworld")
-    parser.add_argument("--num_agents", type=int, default=2, help="Number of agents")
-    parser.add_argument("--batch_size" , type=int, default=32, help="Batch size")
-    parser.add_argument("--lr", type=float, default=0.01, help="Learning rate")
-    parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
-    parser.add_argument("--num_episodes", type=int, default=10, help="Number of episodes")
-    parser.add_argument("--horizon", type=int, default=10, help="Horizon")
-
+    parser.add_argument('--config', type=str, default='empty.yaml', help='config file')
     args = parser.parse_args()
 
-    main(args)
+    # load config file
+    with open('configs/' + args.config) as f:
+        config = yaml.load(f, Loader=yaml.FullLoader)
+
+    wandb.init(project="marl-maxent-exploration", config=config)
+
+    # set up logging
+    timestap = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    folder_name = "logs/" + config['env_name'] + "_" + str(config['size']) + "_" + str(config['num_agents']) + "_" + timestap
+    os.mkdir(folder_name)
+    logging.basicConfig(filename=folder_name+"/logs.txt", level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    main(config, folder_name)
+
+    wandb.finish()
