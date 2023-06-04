@@ -59,6 +59,11 @@ def main(config, folder_name):
     
     policies = []
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    print(f"======== Running on {device} ========")
+    logging.info(f"======== Running on {device} ========")
+
     for e in range(num_episodes):
 
         env.set_render_mode("rgb_array")
@@ -66,7 +71,7 @@ def main(config, folder_name):
         print(f"======== Episode {e}/{num_episodes} ========")
         logging.info(f"======== Episode {e}/{num_episodes} ========")
 
-        policy = [Policy(env.observation_space.shape[1], env.action_space.n) for _ in range(num_agents)]
+        policy = [Policy(env.observation_space.shape[1], env.action_space.n).to(device) for _ in range(num_agents)]
         optimizers = [torch.optim.Adam(policy[i].parameters(), lr=lr) for i in range(num_agents)]
 
         if e != 0:

@@ -8,6 +8,8 @@ import wandb
 
 eps = np.finfo(np.float32).eps.item()
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 def select_action(probs):
     """
     Function to sample an action from a probability distribution.
@@ -24,7 +26,7 @@ def grad_ent(pt):
 def heatmap(running_avg_p, avg_p, e, folder_name):
     """
     Function to plot the heatmap of the probability distribution.
-    
+
     Args:
         running_avg_p (numpy.ndarray): Running average probability distribution.
         avg_p (numpy.ndarray): Average probability distribution.
@@ -33,7 +35,7 @@ def heatmap(running_avg_p, avg_p, e, folder_name):
         folder_name (str): Folder name to save the plots.
     """
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12.5, 5))
-    
+
     ax1.set_title("Running Average Probability Distribution")
     ax2.set_title("Average Probability Distribution")
 
@@ -53,7 +55,7 @@ def heatmap(running_avg_p, avg_p, e, folder_name):
 def learn_policy(env, train_steps, horizon, policy, reward_fn, optimizers, gamma):
     """
     Function to learn a policy using REINFORCE.
-    
+
     Args:
         env (object): The environment object.
         train_steps (int): Number of training steps.
@@ -85,7 +87,7 @@ def learn_policy(env, train_steps, horizon, policy, reward_fn, optimizers, gamma
 
         for t in range(horizon):
 
-            obs = [torch.from_numpy(obs[i]).float().unsqueeze(0) for i in range(num_agents)]
+            obs = [torch.from_numpy(obs[i]).float().unsqueeze(0).to(device) for i in range(num_agents)]
 
             actions_and_log_probs = [policy[i].select_action(obs[i]) for i in range(num_agents)]
 
@@ -140,13 +142,13 @@ def learn_policy(env, train_steps, horizon, policy, reward_fn, optimizers, gamma
 def execute_average_policy(env, horizon, policies, avg_rounds=2):
     """
     Function to execute the average policy over multiple rounds and calculate the average probability distribution and entropy.
-    
+
     Args:
         env (object): The environment object.
         horizon (int): Horizon for each round.
         policies (list): List of policy networks for each agent.
         avg_rounds (int): Number of rounds to average over.
-    
+
     Returns:
         numpy.ndarray: Average probability distribution.
         float: Average entropy.
@@ -194,12 +196,12 @@ def execute_average_policy(env, horizon, policies, avg_rounds=2):
 def execute(env, horizon, policy):
     """
     Function to execute a policy in the environment and calculate the resulting probability distribution.
-    
+
     Args:
         env (object): The environment object.
         horizon (int): Horizon for the execution.
         policy (list): List of policy networks for each agent.
-    
+
     Returns:
         numpy.ndarray: Probability distribution.
     """
@@ -223,11 +225,11 @@ def execute(env, horizon, policy):
 def execute_random(env, horizon):
     """
     Function to execute random actions in the environment and calculate the resulting probability distribution.
-    
+
     Args:
         env (object): The environment object.
         horizon (int): Horizon for the execution.
-    
+
     Returns:
         numpy.ndarray: Probability distribution.
     """
