@@ -107,6 +107,9 @@ class MARLGridEnv(gym.Env):
         self.tile_size = tile_size
         # self.agent_pov = agent_pov
 
+        # Generate a new random grid
+        self._gen_grid(self.width, self.height)
+
     def set_render_mode(self, mode: str):
         """
         Set the desired rendering mode
@@ -121,9 +124,6 @@ class MARLGridEnv(gym.Env):
         options: dict[str, Any] | None = None,
     ) -> tuple[ObsType, dict[str, Any]]:
         super().reset(seed=seed)
-
-        # Generate a new random grid at the start of each episode
-        self._gen_grid(self.width, self.height)
 
         obs = np.empty((len(self.agents), 2), dtype=np.uint8)
 

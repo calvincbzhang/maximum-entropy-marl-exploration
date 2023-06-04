@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from marl_grid.grid import Grid
-from marl_grid.world_object import Lava
+from marl_grid.world_object import Wall
 from marl_grid.marlgrid_env import MARLGridEnv
 from marl_grid.actions import MiniActions
 
@@ -11,7 +11,7 @@ from marl_grid.actions import MiniActions
 class VertWallEnv(MARLGridEnv):
 
     def __init__(
-        self, size, obstacle_type=Lava, max_steps: int | None = None, num_agents=1, **kwargs
+        self, size, obstacle_type=Wall, max_steps: int | None = None, num_agents=1, **kwargs
     ):
         self.obstacle_type = obstacle_type
         self.size = size
