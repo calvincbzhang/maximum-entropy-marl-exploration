@@ -71,7 +71,7 @@ def main(config, folder_name):
 
     for e in range(num_episodes):
 
-        env.set_render_mode("human")
+        env.set_render_mode("rgb_array")
 
         print(f"======== Episode {e}/{num_episodes} ========")
         logging.info(f"======== Episode {e}/{num_episodes} ========")
