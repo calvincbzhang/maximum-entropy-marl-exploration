@@ -148,7 +148,7 @@ def main(config, folder_name):
         print("\n")
         logging.info("\n")
 
-        heatmap(running_avg_p, average_p, e, folder_name)
+        heatmap(running_avg_p, average_p, running_avg_p_baseline, p_baseline, e, folder_name)
 
 
 if __name__ == "__main__":

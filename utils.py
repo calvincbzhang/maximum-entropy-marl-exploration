@@ -38,34 +38,48 @@ def compute_entropy_upper_bound(env):
 
     return entropy_upper
 
-def heatmap(running_avg_p, avg_p, e, folder_name):
+def heatmap(running_avg_p, avg_p, running_avg_p_baseline, p_baseline, e, folder_name):
     """
     Function to plot the heatmap of the probability distribution.
 
     Args:
         running_avg_p (numpy.ndarray): Running average probability distribution.
         avg_p (numpy.ndarray): Average probability distribution.
+        running_avg_p_baseline (numpy.ndarray): Running average probability distribution for baseline.
+        p_baseline (numpy.ndarray): Average probability distribution for baseline.
         e (int): Episode number.
-        env (object): The environment object.
-        folder_name (str): Folder name to save the plots.
+        folder_name (str): Folder name to save the heatmap.
     """
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12.5, 5))
+    fig, axs = plt.subplots(2, 2, figsize=(12.5, 10))
 
-    ax1.set_title("Running Average Probability Distribution")
-    ax2.set_title("Average Probability Distribution")
+    axs[0, 0].imshow(running_avg_p, interpolation="nearest")
+    axs[0, 0].set_title(f"Running Average Probability Distribution")
 
-    ax1.imshow(running_avg_p, interpolation="nearest")
-    ax2.imshow(avg_p, interpolation="nearest")
+    axs[0, 1].imshow(avg_p, interpolation="nearest")
+    axs[0, 1].set_title(f"Average Probability Distribution")
+
+    axs[1, 0].imshow(running_avg_p_baseline, interpolation="nearest")
+    axs[1, 0].set_title(f"Running Average Probability Distribution (Baseline)")
+
+    axs[1, 1].imshow(p_baseline, interpolation="nearest")
+    axs[1, 1].set_title(f"Average Probability Distribution (Baseline)")
 
     # Add legend
-    cbar1 = ax1.figure.colorbar(ax1.imshow(running_avg_p, interpolation="nearest"), ax=ax1)
-    cbar2 = ax2.figure.colorbar(ax2.imshow(avg_p, interpolation="nearest"), ax=ax2)
+    cbar1 = axs[0, 0].figure.colorbar(axs[0, 0].imshow(running_avg_p, interpolation="nearest"), ax=axs[0, 0])
+    cbar2 = axs[0, 1].figure.colorbar(axs[0, 1].imshow(avg_p, interpolation="nearest"), ax=axs[0, 1])
+    cbar3 = axs[1, 0].figure.colorbar(axs[1, 0].imshow(running_avg_p_baseline, interpolation="nearest"), ax=axs[1, 0])
+    cbar4 = axs[1, 1].figure.colorbar(axs[1, 1].imshow(p_baseline, interpolation="nearest"), ax=axs[1, 1])
 
     # Log image to wandb
-    wandb.log({"Probability Distributions": wandb.Image(fig)})
+    wandb.log({"heatmap": [wandb.Image(fig, caption=f"Episode {e}")]})
 
-    fig.savefig(os.path.join(folder_name, f"heatmap_{e}.png"))
-    plt.close(fig)
+    for ax in axs.flat:
+        ax.set(xlabel="x", ylabel="y")
+    for ax in axs.flat:
+        ax.label_outer()
+
+    plt.savefig(f"{folder_name}/heatmap_{e}.png")
+    plt.close()
 
 def learn_policy(env, train_steps, horizon, policy, reward_fn, optimizers, gamma):
     """
