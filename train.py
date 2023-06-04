@@ -24,6 +24,7 @@ def main(config, folder_name):
     env_name = config["env_name"] + "Env"
     size = config["size"]
     num_agents = config["num_agents"]
+    init_pos = config["init_pos"]
 
     num_episodes = config["num_episodes"]
     train_steps = config["train_steps"]
@@ -43,7 +44,11 @@ def main(config, folder_name):
     print(f"Parameters: num_episodes={num_episodes}, horizon={horizon}, gamma={gamma}, lr={lr}")
     logging.info(f"Parameters: num_episodes={num_episodes}, horizon={horizon}, gamma={gamma}, lr={lr}")
 
-    env = gym.make("GridWorld-v0", size=size, num_agents=num_agents)
+    env = gym.make("GridWorld-v0", size=size, num_agents=num_agents, initial_positions=init_pos)
+
+    entropy_upper = compute_entropy_upper_bound(env)
+
+    print(f"======== Entropy Upper Bound: {entropy_upper} ========")
 
     reward_fn = np.zeros(shape=(size, size))
 
@@ -66,7 +71,7 @@ def main(config, folder_name):
 
     for e in range(num_episodes):
 
-        env.set_render_mode("rgb_array")
+        env.set_render_mode("human")
 
         print(f"======== Episode {e}/{num_episodes} ========")
         logging.info(f"======== Episode {e}/{num_episodes} ========")
@@ -96,10 +101,10 @@ def main(config, folder_name):
         # Get next distribtuion p
         p = execute(env, horizon, policy)
 
-        # Force first round to be equal
-        if e == 0:
-            average_p = p_baseline
-            avg_entropy = avg_entropy_baseline
+        # # Force first round to be equal
+        # if e == 0:
+        #     average_p = p_baseline
+        #     avg_entropy = avg_entropy_baseline
 
         # Get the reward function
         reward_fn = grad_ent(average_p)

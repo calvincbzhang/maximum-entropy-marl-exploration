@@ -1,4 +1,4 @@
-env_name: Rooms
+env_name: VertWall
 
 size: 10
 num_agents: 2
@@ -6,6 +6,6 @@ init_pos: [[1, 1], [8, 8]]
 
 num_episodes: 100
 train_steps: 200
-horizon: 1000
+horizon: 32
 gamma: 0.99
 lr: 0.001

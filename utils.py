@@ -23,6 +23,21 @@ def grad_ent(pt):
     grad_p[grad_p > 100] = 1000
     return grad_p
 
+def compute_entropy_upper_bound(env):
+    # count non-walls in grid
+    num_states = 0
+    for i in range(env.size):
+        for j in range(env.size):
+            if not (env.grid.get(i, j) and env.grid.get(i, j).type == "wall"):
+                num_states += 1
+
+    p = 1.0 / num_states
+
+    # compute entropy upper bound
+    entropy_upper = -num_states * p * np.log(p)
+
+    return entropy_upper
+
 def heatmap(running_avg_p, avg_p, e, folder_name):
     """
     Function to plot the heatmap of the probability distribution.

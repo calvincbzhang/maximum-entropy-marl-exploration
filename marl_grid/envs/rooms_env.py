@@ -13,7 +13,7 @@ import random
 class RoomsEnv(MARLGridEnv):
 
     def __init__(
-        self, size, obstacle_type=Wall, max_steps: int | None = None, num_agents=1, **kwargs
+        self, size, obstacle_type=Wall, max_steps: int | None = None, num_agents=1, initial_positions=None, **kwargs
     ):
         self.obstacle_type = obstacle_type
         self.size = size
@@ -25,6 +25,7 @@ class RoomsEnv(MARLGridEnv):
         super().__init__(
             width=size,
             height=size,
+            initial_positions=initial_positions,
             num_agents=num_agents,
             see_through_walls=False,
             max_steps=max_steps,

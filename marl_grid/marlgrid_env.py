@@ -29,7 +29,7 @@ class MARLGridEnv(gym.Env):
 
     metadata = {
         "render_modes": ["human", "rgb_array"],
-        "render_fps": 30,
+        "render_fps": 1,
     }
 
     def __init__(
@@ -37,6 +37,7 @@ class MARLGridEnv(gym.Env):
         grid_size: int | None = None,
         width: int | None = None,
         height: int | None = None,
+        initial_positions: list | None = None,
         max_steps: int = 100,
         num_agents: int = 1,
         see_through_walls: bool = False,
@@ -50,6 +51,7 @@ class MARLGridEnv(gym.Env):
         
         self.agents = range(num_agents)
         self.agent_pos = [None] * num_agents
+        self.initial_positions = initial_positions
 
         # Can't set both grid_size and width/height
         if grid_size:
@@ -127,9 +129,17 @@ class MARLGridEnv(gym.Env):
 
         obs = np.empty((len(self.agents), 2), dtype=np.uint8)
 
-        # These fields should be defined by _gen_grid
+        # Clear agents from grid
         for a in self.agents:
-            assert self.agent_pos[a] is not None
+            if self.agent_pos[a] is not None:
+                self.grid.set(self.agent_pos[a][0], self.agent_pos[a][1], None)
+
+        # Place agents
+        for a in self.agents:
+            if self.initial_positions:
+                self.place_agent_fixed(a, self.initial_positions[a])
+            else:
+                self.place_agent(a)
             obs[a] = self.agent_pos[a]
 
         # Item picked up, being carried, initially nothing
@@ -368,6 +378,17 @@ class MARLGridEnv(gym.Env):
 
         self.agent_pos[agent] = None
         pos = self.place_obj(Agent(), top, size, max_tries=max_tries)
+        self.agent_pos[agent] = pos
+
+        return pos
+    
+    def place_agent_fixed(self, agent, pos):
+        """
+        Set the agent's starting point at an empty position in the grid
+        """
+
+        self.agent_pos[agent] = None
+        self.put_obj(Agent(), *pos)
         self.agent_pos[agent] = pos
 
         return pos
