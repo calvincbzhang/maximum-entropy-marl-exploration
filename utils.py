@@ -210,7 +210,7 @@ def execute(env, horizon, policy):
     obs, _ = env.reset()
 
     for t in range(horizon):
-        obs = [torch.from_numpy(obs[i]).float().unsqueeze(0) for i in range(env.num_agents)]
+        obs = [torch.from_numpy(obs[i]).float().unsqueeze(0).to(device) for i in range(env.num_agents)]
         actions_and_log_probs = [policy[i].select_action(obs[i]) for i in range(env.num_agents)]
         actions = [actions_and_log_probs[i][0] for i in range(env.num_agents)]
 
