@@ -168,7 +168,7 @@ def execute_average_policy(env, horizon, policies, avg_rounds=2):
             probs = torch.stack([torch.tensor(np.zeros(shape=(env.action_space.n))) for _ in range(env.num_agents)])
             var = torch.stack([torch.tensor(np.zeros(shape=(env.action_space.n))) for _ in range(env.num_agents)])
 
-            obs = [torch.from_numpy(obs[i]).float().unsqueeze(0) for i in range(env.num_agents)]
+            obs = [torch.from_numpy(obs[i]).float().unsqueeze(0).to(device) for i in range(env.num_agents)]
 
             for policy in policies:
                 prob = torch.stack([policy[i].get_probs(obs[i]) for i in range(env.num_agents)])

@@ -16,6 +16,7 @@ torch = "^2.0.0"
 scipy = "^1.10.1"
 pyyaml = "^6.0"
 plotly = "^5.14.1"
+wandb = "^0.15.3"
 
 
 [build-system]
