@@ -4,8 +4,8 @@ size: 10
 num_agents: 2
 init_pos: [[1, 1], [8, 8]]
 
-num_episodes: 100
-train_steps: 200
+num_episodes: 1000
+train_steps: 500
 horizon: 32
 gamma: 0.99
-lr: 0.001
+lr: 0.005
