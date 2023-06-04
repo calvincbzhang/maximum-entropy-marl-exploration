@@ -133,7 +133,7 @@ def learn_policy(env, train_steps, horizon, policy, reward_fn, optimizers, gamma
 
         running_loss = running_loss * 0.99 + policy_loss.detach().numpy() * 0.01
 
-        if e % 10 == 0:
+        if e % 100 == 0:
             print(f"Step {e}/{train_steps} | Running Reward: {running_reward} | Running Loss: {running_loss}")
             logging.info(f"Step {e}/{train_steps} | Running Reward: {running_reward} | Running Loss: {running_loss}")
 
