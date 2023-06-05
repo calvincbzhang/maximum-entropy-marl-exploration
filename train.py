@@ -85,7 +85,7 @@ def main(config, folder_name):
         policies.append(policy)
 
         # Execute the random policy and estimate the entropy
-        a = 2 # average over this many rounds
+        a = 10 # average over this many rounds
         p_baseline = execute_random(env, horizon)
         avg_entropy_baseline = scipy.stats.entropy(p_baseline.flatten())
         for av in range(a-1):

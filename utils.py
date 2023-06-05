@@ -168,7 +168,7 @@ def learn_policy(env, train_steps, horizon, policy, reward_fn, optimizers, gamma
 
     return policy
 
-def execute_average_policy(env, horizon, policies, avg_rounds=2):
+def execute_average_policy(env, horizon, policies, avg_rounds=10):
     """
     Function to execute the average policy over multiple rounds and calculate the average probability distribution and entropy.
 
