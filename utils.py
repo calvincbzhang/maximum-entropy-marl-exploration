@@ -26,8 +26,8 @@ def grad_ent(pt):
 def compute_entropy_upper_bound(env):
     # count non-walls in grid
     num_states = 0
-    for i in range(env.size):
-        for j in range(env.size):
+    for i in range(env.width):
+        for j in range(env.height):
             if not (env.grid.get(i, j) and env.grid.get(i, j).type == "wall"):
                 num_states += 1
 
@@ -38,7 +38,7 @@ def compute_entropy_upper_bound(env):
 
     return entropy_upper
 
-def heatmap(running_avg_p, avg_p, running_avg_p_baseline, p_baseline, e, folder_name):
+def heatmap(running_avg_p, avg_p, running_avg_p_baseline, p_baseline, e, height, width, folder_name):
     """
     Function to plot the heatmap of the probability distribution.
 
@@ -50,25 +50,52 @@ def heatmap(running_avg_p, avg_p, running_avg_p_baseline, p_baseline, e, folder_
         e (int): Episode number.
         folder_name (str): Folder name to save the heatmap.
     """
-    fig, axs = plt.subplots(2, 2, figsize=(12.5, 10))
 
-    axs[0, 0].imshow(running_avg_p, interpolation="nearest")
-    axs[0, 0].set_title(f"Running Average Probability Distribution")
+    # Find the widest range
+    all_data = [running_avg_p, avg_p, running_avg_p_baseline, p_baseline]
+    vmin = min(np.min(data) for data in all_data)
+    vmax = max(np.max(data) for data in all_data)
 
-    axs[0, 1].imshow(avg_p, interpolation="nearest")
-    axs[0, 1].set_title(f"Average Probability Distribution")
+    print(f"================ Heatmap ================")
+    print(f"=========== vmax: {vmax} ===========")
 
-    axs[1, 0].imshow(running_avg_p_baseline, interpolation="nearest")
-    axs[1, 0].set_title(f"Running Average Probability Distribution (Baseline)")
+    logging.info(f"================ Heatmap ================")
+    logging.info(f"=========== vmax: {vmax} ===========")
 
-    axs[1, 1].imshow(p_baseline, interpolation="nearest")
-    axs[1, 1].set_title(f"Average Probability Distribution (Baseline)")
+    if height/float(width) < 2:
+        fig, axs = plt.subplots(2, 2, figsize=(1.5 * width, height))
+        # Plot the heatmap with the range
+        axs[0, 0].imshow(running_avg_p, interpolation="none", vmin=vmin, vmax=vmax)
+        axs[0, 0].set_title(f"Running Average Probability Distribution")
 
-    # Add legend
-    cbar1 = axs[0, 0].figure.colorbar(axs[0, 0].imshow(running_avg_p, interpolation="nearest"), ax=axs[0, 0])
-    cbar2 = axs[0, 1].figure.colorbar(axs[0, 1].imshow(avg_p, interpolation="nearest"), ax=axs[0, 1])
-    cbar3 = axs[1, 0].figure.colorbar(axs[1, 0].imshow(running_avg_p_baseline, interpolation="nearest"), ax=axs[1, 0])
-    cbar4 = axs[1, 1].figure.colorbar(axs[1, 1].imshow(p_baseline, interpolation="nearest"), ax=axs[1, 1])
+        axs[0, 1].imshow(avg_p, interpolation="none", vmin=vmin, vmax=vmax)
+        axs[0, 1].set_title(f"Average Probability Distribution")
+
+        axs[1, 0].imshow(running_avg_p_baseline, interpolation="none", vmin=vmin, vmax=vmax)
+        axs[1, 0].set_title(f"Running Average Probability Distribution (Baseline)")
+
+        axs[1, 1].imshow(p_baseline, interpolation="none", vmin=vmin, vmax=vmax)
+        axs[1, 1].set_title(f"Average Probability Distribution (Baseline)")
+
+        # Add legend
+        cbar = axs[0, 0].figure.colorbar(axs[0, 0].imshow(running_avg_p, interpolation="none", vmin=vmin, vmax=vmax), ax=axs)
+    else:
+        fig, axs = plt.subplots(4, 1, figsize=(1.01 * height, 5 * width))
+        # Plot the heatmap with the range
+        axs[0].imshow(running_avg_p, interpolation="none", vmin=vmin, vmax=vmax)
+        axs[0].set_title(f"Running Average Probability Distribution")
+
+        axs[1].imshow(avg_p, interpolation="none", vmin=vmin, vmax=vmax)
+        axs[1].set_title(f"Average Probability Distribution")
+
+        axs[2].imshow(running_avg_p_baseline, interpolation="none", vmin=vmin, vmax=vmax)
+        axs[2].set_title(f"Running Average Probability Distribution (Baseline)")
+
+        axs[3].imshow(p_baseline, interpolation="none", vmin=vmin, vmax=vmax)
+        axs[3].set_title(f"Average Probability Distribution (Baseline)")
+
+        # Add legend
+        cbar = axs[0].figure.colorbar(axs[0].imshow(running_avg_p, interpolation="nearest", vmin=vmin, vmax=vmax), ax=axs)
 
     # Log image to wandb
     wandb.log({"Probability Distributions": [wandb.Image(fig, caption=f"Episode {e}")]})
@@ -113,6 +140,11 @@ def learn_policy(env, train_steps, horizon, policy, reward_fn, optimizers, gamma
         obs, _ = env.reset()
 
         ep_reward = np.array([0. for _ in range(num_agents)])
+
+        reward = [reward_fn[obs[i][0], obs[i][1]] for i in range(num_agents)]
+        ep_reward += reward
+
+        rewards.append(reward)
 
         for t in range(horizon):
 
@@ -159,6 +191,7 @@ def learn_policy(env, train_steps, horizon, policy, reward_fn, optimizers, gamma
             optimizers[i].zero_grad()
             policy_loss[i].backward()
             optimizers[i].step()
+            # schedulers[i].step()
 
         running_loss = running_loss * 0.99 + policy_loss.detach().numpy() * 0.01
 
@@ -168,7 +201,7 @@ def learn_policy(env, train_steps, horizon, policy, reward_fn, optimizers, gamma
 
     return policy
 
-def execute_average_policy(env, horizon, policies, avg_rounds=10):
+def execute_average_policy(env, horizon, policies, entropies, avg_rounds=10):
     """
     Function to execute the average policy over multiple rounds and calculate the average probability distribution and entropy.
 
@@ -193,24 +226,27 @@ def execute_average_policy(env, horizon, policies, avg_rounds=10):
 
         p = np.zeros(shape=(env.width, env.height))
 
+        for o in obs:
+            p[o[0], o[1]] += 1
+
         for t in range(horizon):
             probs = torch.stack([torch.tensor(np.zeros(shape=(env.action_space.n))) for _ in range(env.num_agents)]).to(device)
             # var = torch.stack([torch.tensor(np.zeros(shape=(env.action_space.n))) for _ in range(env.num_agents)]).to(device)
 
             obs = [torch.from_numpy(obs[i]).float().unsqueeze(0).to(device) for i in range(env.num_agents)]
 
-            for policy in policies:
+            for policy, entropy in zip(policies, entropies):
                 prob = torch.stack([policy[i].get_probs(obs[i]) for i in range(env.num_agents)])
-                probs += prob
+                probs += (prob * entropy)
 
-            probs /= len(policies)
+            probs /= (len(policies) * sum(entropies))
             actions = [select_action(probs[i]) for i in range(env.num_agents)]
 
             obs, _, _, _, _ = env.step(actions)
             for o in obs:
                 p[o[0], o[1]] += 1
 
-        p /= horizon
+        p /= ((horizon+1) * env.num_agents)
 
         average_p += p
         avg_entropy += scipy.stats.entropy(average_p.flatten())
@@ -234,22 +270,32 @@ def execute(env, horizon, policy):
     Returns:
         numpy.ndarray: Probability distribution.
     """
-    p = np.zeros(shape=(env.width, env.height))
 
-    obs, _ = env.reset()
+    average_p = np.zeros(shape=(env.width, env.height))
 
-    for t in range(horizon):
-        obs = [torch.from_numpy(obs[i]).float().unsqueeze(0).to(device) for i in range(env.num_agents)]
-        actions_and_log_probs = [policy[i].select_action(obs[i]) for i in range(env.num_agents)]
-        actions = [actions_and_log_probs[i][0] for i in range(env.num_agents)]
+    for round in range(10):
+        p = np.zeros(shape=(env.width, env.height))
 
-        obs, _, _, _, _ = env.step(actions)
+        obs, _ = env.reset()
         for o in obs:
             p[o[0], o[1]] += 1
 
-    p /= horizon
+        for t in range(horizon):
+            obs = [torch.from_numpy(obs[i]).float().unsqueeze(0).to(device) for i in range(env.num_agents)]
+            actions_and_log_probs = [policy[i].select_action(obs[i]) for i in range(env.num_agents)]
+            actions = [actions_and_log_probs[i][0] for i in range(env.num_agents)]
 
-    return p
+            obs, _, _, _, _ = env.step(actions)
+            for o in obs:
+                p[o[0], o[1]] += 1
+
+        p /= ((horizon+1) * env.num_agents)
+
+        average_p += p
+    
+    average_p /= 10
+
+    return average_p
 
 def execute_random(env, horizon):
     """
@@ -265,6 +311,8 @@ def execute_random(env, horizon):
     p = np.zeros(shape=(env.width, env.height))
 
     obs, _ = env.reset()
+    for o in obs:
+        p[o[0], o[1]] += 1
 
     for t in range(horizon):
         actions = [env.action_space.sample() for _ in range(env.num_agents)]
@@ -272,6 +320,6 @@ def execute_random(env, horizon):
         for o in obs:
             p[o[0], o[1]] += 1
 
-    p /= horizon
+    p /= ((horizon+1) * env.num_agents)
 
     return p

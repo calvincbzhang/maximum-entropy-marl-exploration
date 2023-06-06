@@ -13,18 +13,17 @@ import random
 class RoomsEnv(MARLGridEnv):
 
     def __init__(
-        self, size, obstacle_type=Wall, max_steps: int | None = None, num_agents=1, initial_positions=None, **kwargs
+        self, height, width, obstacle_type=Wall, max_steps: int | None = None, num_agents=1, initial_positions=None, **kwargs
     ):
         self.obstacle_type = obstacle_type
-        self.size = size
         self.num_agents = num_agents
 
         if max_steps is None:
-            max_steps = 4 * size**2
+            max_steps = 4 * int(np.maximum(width, height))**2
 
         super().__init__(
-            width=size,
-            height=size,
+            width=width,
+            height=height,
             initial_positions=initial_positions,
             num_agents=num_agents,
             see_through_walls=False,
@@ -35,7 +34,7 @@ class RoomsEnv(MARLGridEnv):
         )
 
     def _gen_grid(self, width, height):
-        assert width >= 5 and height >= 5, "The grid should be at least 5x5."
+        # assert width >= 5 and height >= 5, "The grid should be at least 5x5."
 
         # Create an empty grid
         self.grid = Grid(width, height)

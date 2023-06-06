@@ -5,11 +5,12 @@ import numpy as np
 import argparse
 
 import torch
+import torch.optim.lr_scheduler as scheduler
 import os
 
 import scipy
 
-from policies import Policy
+from policies import *
 from utils import *
 
 import logging
@@ -23,6 +24,12 @@ def main(config, folder_name):
 
     env_name = config["env_name"] + "Env"
     size = config["size"]
+    if size == "None":
+        height = config["height"]
+        width = config["width"]
+    else:
+        height = size
+        width = size
     num_agents = config["num_agents"]
     init_pos = config["init_pos"]
 
@@ -38,31 +45,32 @@ def main(config, folder_name):
     )
 
     # Print and log environment information
-    print(f"======== Running {env_name} with size {size} and {num_agents} agents ========")
-    logging.info(f"======== Running {env_name} with size {size} and {num_agents} agents ========")
+    print(f"======== Running {env_name} with size {height} x {width} and {num_agents} agents ========")
+    logging.info(f"======== Running {env_name} with size {height} x {width} and {num_agents} agents ========")
     # Print and log hyperparameters
     print(f"Parameters: num_episodes={num_episodes}, horizon={horizon}, gamma={gamma}, lr={lr}")
     logging.info(f"Parameters: num_episodes={num_episodes}, horizon={horizon}, gamma={gamma}, lr={lr}")
 
-    env = gym.make("GridWorld-v0", size=size, num_agents=num_agents, initial_positions=init_pos)
+    env = gym.make("GridWorld-v0", height=height, width=width, num_agents=num_agents, initial_positions=init_pos)
 
     entropy_upper = compute_entropy_upper_bound(env)
 
     print(f"======== Entropy Upper Bound: {entropy_upper} ========")
 
-    reward_fn = np.zeros(shape=(size, size))
+    reward_fn = np.zeros(shape=(width, height))
 
-    running_avg_p = np.zeros(shape=(size, size))
+    running_avg_p = np.zeros(shape=(width, height))
     running_avg_ent = 0
     running_avg_entropies = []
     running_avg_ps = []
 
-    running_avg_p_baseline = np.zeros(shape=(size, size))
+    running_avg_p_baseline = np.zeros(shape=(width, height))
     running_avg_ent_baseline = 0
     running_avg_entropies_baseline = []
     running_avg_ps_baseline = []
     
     policies = []
+    entropies = []
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -76,8 +84,9 @@ def main(config, folder_name):
         print(f"======== Episode {e}/{num_episodes} ========")
         logging.info(f"======== Episode {e}/{num_episodes} ========")
 
-        policy = [Policy(env.observation_space.shape[1], env.action_space.n).to(device) for _ in range(num_agents)]
+        policy = [SimplePolicy(env.observation_space.shape[1], env.action_space.n).to(device) for _ in range(num_agents)]
         optimizers = [torch.optim.Adam(policy[i].parameters(), lr=lr) for i in range(num_agents)]
+        # schedulers = [scheduler.LinearLR(optimizers[i], start_factor=0.5, total_iters=train_steps/4.) for i in range(num_agents)]
 
         if e != 0:
             policy = learn_policy(env, train_steps, horizon, policy, reward_fn, optimizers, gamma)
@@ -95,16 +104,18 @@ def main(config, folder_name):
         p_baseline /= float(a)
         avg_entropy_baseline /= float(a)
 
-        # Execute the average policy so far and estimate the entropy
-        average_p, avg_entropy = execute_average_policy(env, horizon, policies)
-
         # Get next distribtuion p
         p = execute(env, horizon, policy)
 
-        # # Force first round to be equal
-        # if e == 0:
-        #     average_p = p_baseline
-        #     avg_entropy = avg_entropy_baseline
+        entropies.append(scipy.stats.entropy(p.flatten()))
+
+        # Execute the average policy so far and estimate the entropy
+        average_p, avg_entropy = execute_average_policy(env, horizon, policies, entropies)
+
+        # Force first round to be equal
+        if e == 0:
+            average_p = p_baseline
+            avg_entropy = avg_entropy_baseline
 
         # Get the reward function
         reward_fn = grad_ent(average_p)
@@ -125,7 +136,7 @@ def main(config, folder_name):
         wandb.log({"Average Entropy": avg_entropy, "Running Average Entropy": running_avg_ent, "Average Entropy Baseline": avg_entropy_baseline, "Running Average Entropy Baseline": running_avg_ent_baseline})
 
         # Print and log results
-        print("=========== p ===========")
+        print(f"=========== p ===========")
         print(p)
         print("=========== average_p ===========")
         print(average_p)
@@ -139,7 +150,7 @@ def main(config, folder_name):
         logging.info("========================")
 
         # Print round average entropy, running average entropy, round entropy baseline, running average entropy baseline
-        print(f"Round Average Entropy[{e}] = {avg_entropy} \t Running Average Entropy = {running_avg_ent}")
+        print(f"Round Average Entropy[{e}] = {avg_entropy} \t Running Average Entropy = {running_avg_ent} \t Entropy of p = {entropies[-1]}")
         print(f"Round Entropy Baseline[{e}] = {avg_entropy_baseline} \t Running Average Entropy Baseline = {running_avg_ent_baseline}")
 
         logging.info(f"Round Average Entropy[{e}] = {avg_entropy} \t Running Average Entropy = {running_avg_ent}")
@@ -148,7 +159,7 @@ def main(config, folder_name):
         print("\n")
         logging.info("\n")
 
-        heatmap(running_avg_p, average_p, running_avg_p_baseline, p_baseline, e, folder_name)
+        heatmap(running_avg_p, average_p, running_avg_p_baseline, p_baseline, e, height, width, folder_name)
 
 
 if __name__ == "__main__":
@@ -166,7 +177,11 @@ if __name__ == "__main__":
 
     # set up logging
     timestap = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    folder_name = "logs/" + config['env_name'] + "_" + str(config['size']) + "_" + str(config['num_agents']) + "_" + timestap
+    if config['size'] == "None":
+        folder_name = "logs/" + config['env_name'] + "_" + str(config['height']) + "_" + str(config['width']) + "_" + str(config['num_agents']) + "_" + timestap
+    else:
+        folder_name = "logs/" + config['env_name'] + "_" + str(config['size']) + "_" + str(config['num_agents']) + "_" + timestap
+        
     os.mkdir(folder_name)
     logging.basicConfig(filename=folder_name+"/logs.txt", level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 

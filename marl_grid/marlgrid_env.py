@@ -29,7 +29,7 @@ class MARLGridEnv(gym.Env):
 
     metadata = {
         "render_modes": ["human", "rgb_array"],
-        "render_fps": 1,
+        "render_fps": 30,
     }
 
     def __init__(
