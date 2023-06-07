@@ -77,6 +77,15 @@ def main(config, folder_name):
     print(f"======== Running on {device} ========")
     logging.info(f"======== Running on {device} ========")
 
+    # TODO: remove
+    walls = np.zeros(shape=(width, height))
+    # first line and last line are walls
+    walls[0, :] = 1
+    walls[-1, :] = 1
+    # first column and last column are walls
+    walls[:, 0] = 1
+    walls[:, -1] = 1
+
     for e in range(num_episodes):
 
         env.set_render_mode("rgb_array")
@@ -113,12 +122,13 @@ def main(config, folder_name):
         average_p, avg_entropy = execute_average_policy(env, horizon, policies, entropies)
 
         # Force first round to be equal
-        if e == 0:
-            average_p = p_baseline
-            avg_entropy = avg_entropy_baseline
+        # if e == 0:
+        #     average_p = p_baseline
+        #     avg_entropy = avg_entropy_baseline
 
         # Get the reward function
-        reward_fn = grad_ent(average_p)
+        # TODO: remove walls
+        reward_fn = grad_ent(average_p+walls)
 
         # Update experimental running averages.
         running_avg_ent = running_avg_ent * (e)/float(e+1) + avg_entropy/float(e+1)
