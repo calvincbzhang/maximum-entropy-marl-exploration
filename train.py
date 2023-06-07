@@ -84,7 +84,7 @@ def main(config, folder_name):
         print(f"======== Episode {e}/{num_episodes} ========")
         logging.info(f"======== Episode {e}/{num_episodes} ========")
 
-        policy = [SimplePolicy(env.observation_space.shape[1], env.action_space.n).to(device) for _ in range(num_agents)]
+        policy = [Policy(env.observation_space.shape[1], env.action_space.n).to(device) for _ in range(num_agents)]
         optimizers = [torch.optim.Adam(policy[i].parameters(), lr=lr) for i in range(num_agents)]
         # schedulers = [scheduler.LinearLR(optimizers[i], start_factor=0.5, total_iters=train_steps/4.) for i in range(num_agents)]
 
