@@ -220,6 +220,8 @@ def execute_average_policy(env, horizon, policies, entropies, avg_rounds=10):
 
     env.set_render_mode("rgb_array")
 
+    no_walls = np.ones(shape=(env.width, env.height))
+
     for run in range(avg_rounds):
 
         obs, _ = env.reset()
@@ -242,7 +244,13 @@ def execute_average_policy(env, horizon, policies, entropies, avg_rounds=10):
             probs /= (len(policies) * sum(entropies))
             actions = [select_action(probs[i]) for i in range(env.num_agents)]
 
-            obs, _, _, _, _ = env.step(actions)
+            obs, _, _, _, info = env.step(actions)
+
+            wall_pos = info["wall_pos"]
+
+            for w in wall_pos:
+                no_walls[w[0], w[1]] = 0
+
             for o in obs:
                 p[o[0], o[1]] += 1
 
@@ -256,7 +264,7 @@ def execute_average_policy(env, horizon, policies, entropies, avg_rounds=10):
     average_p /= avg_rounds
     avg_entropy /= avg_rounds
 
-    return average_p, avg_entropy
+    return average_p, avg_entropy, no_walls
 
 def execute(env, horizon, policy):
     """

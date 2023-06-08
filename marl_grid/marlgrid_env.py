@@ -398,15 +398,16 @@ class MARLGridEnv(gym.Env):
     ) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
         self.step_count += 1
 
-        order = np.random.permutation(len(action))
+        # order = np.random.permutation(len(action))
 
         reward = np.zeros(len(action))
         terminated = False
         truncated = False
 
         obs = np.empty((len(action), 2), dtype=np.uint8)
+        wall_pos = []
 
-        for i in order:
+        for i in range(len(action)):
 
             # Get the position in the cell the agent will be after executing the action
             fwd_pos = self.agent_pos[i] \
@@ -434,6 +435,7 @@ class MARLGridEnv(gym.Env):
                 if fwd_cell is not None and fwd_cell.type == "lava":
                     terminated = True
                 if fwd_cell is not None and (fwd_cell.type == "wall"):
+                    wall_pos.append(fwd_pos)
                     obs[i] = self.agent_pos[i]
 
             elif len(self.actions) > 5:
@@ -474,7 +476,7 @@ class MARLGridEnv(gym.Env):
 
         reward = np.mean(reward)
 
-        return obs, reward, terminated, truncated, {}
+        return obs, reward, terminated, truncated, {'wall_pos': wall_pos}
 
     def gen_obs(self):
         """

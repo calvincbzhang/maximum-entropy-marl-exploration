@@ -77,14 +77,8 @@ def main(config, folder_name):
     print(f"======== Running on {device} ========")
     logging.info(f"======== Running on {device} ========")
 
-    # TODO: remove
-    walls = np.zeros(shape=(width, height))
-    # first line and last line are walls
-    walls[0, :] = 1
-    walls[-1, :] = 1
-    # first column and last column are walls
-    walls[:, 0] = 1
-    walls[:, -1] = 1
+    # variable to remember walls
+    non_walls = np.ones(shape=(width, height))
 
     for e in range(num_episodes):
 
@@ -119,16 +113,17 @@ def main(config, folder_name):
         entropies.append(scipy.stats.entropy(p.flatten()))
 
         # Execute the average policy so far and estimate the entropy
-        average_p, avg_entropy = execute_average_policy(env, horizon, policies, entropies)
+        average_p, avg_entropy, no_walls = execute_average_policy(env, horizon, policies, entropies)
+
+        non_walls = np.logical_and(non_walls, no_walls)
 
         # Force first round to be equal
-        # if e == 0:
-        #     average_p = p_baseline
-        #     avg_entropy = avg_entropy_baseline
+        if e == 0:
+            average_p = p_baseline
+            avg_entropy = avg_entropy_baseline
 
         # Get the reward function
-        # TODO: remove walls
-        reward_fn = grad_ent(average_p+walls)
+        reward_fn = grad_ent(average_p) * non_walls
 
         # Update experimental running averages.
         running_avg_ent = running_avg_ent * (e)/float(e+1) + avg_entropy/float(e+1)
@@ -150,11 +145,15 @@ def main(config, folder_name):
         print(p)
         print("=========== average_p ===========")
         print(average_p)
+        print("=========== reward_fn ===========")
+        print(reward_fn)
 
         logging.info("=========== p ===========")
         logging.info(p)
         logging.info("=========== average_p ===========")
         logging.info(average_p)
+        logging.info("=========== reward_fn ===========")
+        logging.info(reward_fn)
 
         print("========================")
         logging.info("========================")
@@ -170,6 +169,12 @@ def main(config, folder_name):
         logging.info("\n")
 
         heatmap(running_avg_p, average_p, running_avg_p_baseline, p_baseline, e, height, width, folder_name)
+        # plot binary mask of walls
+        fig = plt.figure()
+        plt.imshow(non_walls)
+        plt.title("Walls")
+        wandb.log({"Walls": wandb.Image(fig)})
+        plt.close()
 
 
 if __name__ == "__main__":
