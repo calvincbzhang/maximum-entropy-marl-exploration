@@ -127,7 +127,7 @@ def learn_policy(env, train_steps, horizon, policy, reward_fn, optimizers, gamma
     num_agents = env.num_agents
 
     running_reward = np.array([0. for _ in range(num_agents)])
-    running_loss = np.array([0. for _ in range(num_agents)])
+    running_loss = 0
 
     print(f"======== Learning Policy ========")
     logging.info(f"======== Learning Policy ========")
@@ -182,18 +182,20 @@ def learn_policy(env, train_steps, horizon, policy, reward_fn, optimizers, gamma
 
         # Compute policy loss
         for log_prob, reward in zip(saved_log_probs, rewards):
-            policy_loss.append(-torch.tensor(log_prob) * torch.tensor(np.array(reward)))
+            policy_loss.append(torch.stack([-log_prob[i] * reward[i] for i in range(num_agents)]))
 
-        policy_loss = torch.stack(policy_loss).sum(dim=0).requires_grad_(True)
+        policy_loss = torch.stack(policy_loss).sum()
 
         # Update policy
         for i in range(num_agents):
             optimizers[i].zero_grad()
-            policy_loss[i].backward()
-            optimizers[i].step()
-            # schedulers[i].step()
 
-        running_loss = running_loss * 0.99 + policy_loss.detach().numpy() * 0.01
+        policy_loss.backward()
+
+        for i in range(num_agents):
+            optimizers[i].step()
+
+        running_loss = running_loss * 0.99 + policy_loss * 0.01
 
         if e % 100 == 0:
             print(f"Step {e}/{train_steps} | Running Reward: {running_reward} | Running Loss: {running_loss}")
@@ -215,6 +217,13 @@ def execute_average_policy(env, horizon, policies, entropies, avg_rounds=10):
         numpy.ndarray: Average probability distribution.
         float: Average entropy.
     """
+
+    # if len(policies) > 10:
+    #     # get indices of most entropic policies
+    #     indices = np.argsort(entropies)[-10:]
+    #     policies = [policies[i] for i in indices]
+    #     entropies = [entropies[i] for i in indices]
+
     average_p = np.zeros(shape=(env.width, env.height))
     avg_entropy = 0
 
@@ -242,7 +251,12 @@ def execute_average_policy(env, horizon, policies, entropies, avg_rounds=10):
                 probs += (prob * entropy)
 
             probs /= (len(policies) * sum(entropies))
+
+            # epsilon greedy
+            # if np.random.uniform() < 0.1:
             actions = [select_action(probs[i]) for i in range(env.num_agents)]
+            # else:
+                # actions = [torch.argmax(probs[i]).item() for i in range(env.num_agents)]
 
             obs, _, _, _, info = env.step(actions)
 
@@ -290,8 +304,12 @@ def execute(env, horizon, policy):
 
         for t in range(horizon):
             obs = [torch.from_numpy(obs[i]).float().unsqueeze(0).to(device) for i in range(env.num_agents)]
-            actions_and_log_probs = [policy[i].select_action(obs[i]) for i in range(env.num_agents)]
-            actions = [actions_and_log_probs[i][0] for i in range(env.num_agents)]
+
+            # epsilon greedy
+            # if np.random.uniform() < 0.1:
+            actions = [policy[i].select_action(obs[i])[0] for i in range(env.num_agents)]
+            # else:
+                # actions = [policy[i].select_action_greedy(obs[i]) for i in range(env.num_agents)]
 
             obs, _, _, _, _ = env.step(actions)
             for o in obs:

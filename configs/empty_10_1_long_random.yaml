@@ -1,0 +1,11 @@
+env_name: Empty
+
+size: 10
+num_agents: 1
+init_pos: None
+horizon: 500
+
+num_episodes: 100
+train_steps: 200
+gamma: 0.99
+lr: 0.001

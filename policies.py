@@ -35,6 +35,11 @@ class Policy(nn.Module):
         action = m.sample()
 
         return action.item(), m.log_prob(action)
+    
+    def select_action_greedy(self, obs):
+        probs = self.forward(obs)
+        action = torch.argmax(probs, dim=1)
+        return action.item()
         
     def get_probs(self, obs):
         probs = self.forward(obs)

@@ -23,8 +23,8 @@ class Actions(IntEnum):
 
 class MiniActions(IntEnum):
     # Go up, down, right, left or do nothing
-    nothing = 0
-    up = 1
-    down = 2
-    right = 3
-    left = 4
+    # nothing = 0
+    up = 0
+    down = 1
+    right = 2
+    left = 3

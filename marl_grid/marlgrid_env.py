@@ -74,7 +74,8 @@ class MARLGridEnv(gym.Env):
 
         sample_obs = []
         for i in range(len(self.agents)):
-            sample_obs.append([width, height])
+            sample_obs.append([width, height, width, height])
+            # sample_obs.append([width, height])
         self.observation_space = spaces.MultiDiscrete(
             nvec=(sample_obs),
             dtype="uint8",
@@ -127,7 +128,8 @@ class MARLGridEnv(gym.Env):
     ) -> tuple[ObsType, dict[str, Any]]:
         super().reset(seed=seed)
 
-        obs = np.empty((len(self.agents), 2), dtype=np.uint8)
+        obs = np.empty((len(self.agents), 4), dtype=np.uint8)
+        # obs = np.empty((len(self.agents), 2), dtype=np.uint8)
 
         # Clear agents from grid
         for a in self.agents:
@@ -140,7 +142,8 @@ class MARLGridEnv(gym.Env):
                 self.place_agent_fixed(a, self.initial_positions[a])
             else:
                 self.place_agent(a)
-            obs[a] = self.agent_pos[a]
+            obs[a] = np.concatenate((self.agent_pos[a], self.agent_pos[a]))
+            # obs[a] = self.agent_pos[a]
 
         # Item picked up, being carried, initially nothing
         for a in self.agents:
@@ -407,7 +410,11 @@ class MARLGridEnv(gym.Env):
         obs = np.empty((len(action), 2), dtype=np.uint8)
         wall_pos = []
 
+        prev_pos = np.empty((len(action), 2), dtype=np.uint8)
+
         for i in range(len(action)):
+
+            prev_pos[i] = self.agent_pos[i]
 
             # Get the position in the cell the agent will be after executing the action
             fwd_pos = self.agent_pos[i] \
@@ -421,10 +428,10 @@ class MARLGridEnv(gym.Env):
 
             obs[i] = fwd_pos
 
-            if action[i] == self.actions.nothing:
-                pass
+            # if action[i] == self.actions.nothing:
+            #     pass
 
-            elif action[i] in range(1,5):
+            if action[i] in range(4):
                 if fwd_cell is None or fwd_cell.can_overlap():
                     self.grid.set(self.agent_pos[i][0], self.agent_pos[i][1], None)
                     self.agent_pos[i] = tuple(fwd_pos)
@@ -473,6 +480,7 @@ class MARLGridEnv(gym.Env):
             self.render()
 
         # obs = self.gen_obs()
+        obs = np.concatenate((obs, prev_pos), axis=1)
 
         reward = np.mean(reward)
 

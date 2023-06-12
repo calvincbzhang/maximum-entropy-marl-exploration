@@ -31,7 +31,7 @@ def main(config, folder_name):
         height = size
         width = size
     num_agents = config["num_agents"]
-    init_pos = config["init_pos"]
+    init_pos = config["init_pos"] if config["init_pos"] != "None" else None
 
     num_episodes = config["num_episodes"]
     train_steps = config["train_steps"]
