@@ -63,6 +63,7 @@ def main(config, folder_name):
     running_avg_ent = 0
     running_avg_entropies = []
     running_avg_ps = []
+    ps = []
 
     running_avg_p_baseline = np.zeros(shape=(width, height))
     running_avg_ent_baseline = 0
@@ -109,11 +110,17 @@ def main(config, folder_name):
 
         # Get next distribtuion p
         p = execute(env, horizon, policy)
-
+        
+        ps.append(p)
         entropies.append(scipy.stats.entropy(p.flatten()))
 
+        weights = get_weights(ps)
+        # reverse weights
+        weights = weights[::-1]
+        print(weights)
+
         # Execute the average policy so far and estimate the entropy
-        average_p, avg_entropy, no_walls = execute_average_policy(env, horizon, policies, entropies)
+        average_p, avg_entropy, no_walls = execute_average_policy(env, horizon, policies, weights, entropies)
 
         non_walls = np.logical_and(non_walls, no_walls)
 
@@ -168,6 +175,9 @@ def main(config, folder_name):
         print("\n")
         logging.info("\n")
 
+        # save policy
+        torch.save(policy, f"{folder_name}/policy_{e}.pt")
+
         heatmap(running_avg_p, average_p, running_avg_p_baseline, p_baseline, e, height, width, folder_name)
         # plot binary mask of walls
         fig = plt.figure()
@@ -175,13 +185,16 @@ def main(config, folder_name):
         plt.title("Walls")
         wandb.log({"Walls": wandb.Image(fig)})
         plt.close()
+    
+    # save average p
+    np.save(f"{folder_name}/average_p_{e}.npy", average_p)
 
 
 if __name__ == "__main__":
 
     # parse arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='empty.yaml', help='config file')
+    parser.add_argument('--config', type=str, default='empty_10_2_short.yaml', help='config file')
     args = parser.parse_args()
 
     # load config file
@@ -192,10 +205,7 @@ if __name__ == "__main__":
 
     # set up logging
     timestap = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    if config['size'] == "None":
-        folder_name = "logs/" + config['env_name'] + "_" + str(config['height']) + "_" + str(config['width']) + "_" + str(config['num_agents']) + "_" + timestap
-    else:
-        folder_name = "logs/" + config['env_name'] + "_" + str(config['size']) + "_" + str(config['num_agents']) + "_" + timestap
+    folder_name = "logs/" + args.config + "_" + timestap
         
     os.mkdir(folder_name)
     logging.basicConfig(filename=folder_name+"/logs.txt", level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

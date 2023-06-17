@@ -2,10 +2,10 @@ env_name: Empty
 
 size: 10
 num_agents: 4
-init_pos: [[1, 1], [1, 8], [8, 1] [8, 8]]
-horizon: 25
+init_pos: [[1, 1], [1, 8], [8, 1], [8, 8]]
+horizon: 16
 
 num_episodes: 100
-train_steps: 200
+train_steps: 1000
 gamma: 0.99
-lr: 0.001
+lr: 0.00001

@@ -3,9 +3,9 @@ env_name: Empty
 size: 10
 num_agents: 1
 init_pos: [[1, 1]]
-horizon: 100
+horizon: 64
 
 num_episodes: 100
-train_steps: 200
+train_steps: 1000
 gamma: 0.99
-lr: 0.001
+lr: 0.00001

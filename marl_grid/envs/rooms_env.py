@@ -42,30 +42,13 @@ class RoomsEnv(MARLGridEnv):
         # Generate the surrounding walls
         self.grid.wall_rect(0, 0, width, height)
 
-        room_w = width // 2
-        room_h = height // 2
+        walls = [
+            [5, 1], [5, 3], [5, 4], [5, 5], [5, 6], [5, 7], [5, 9],
+            [1, 5], [3, 5], [4, 5], [6, 5], [7, 5], [9, 5]
+        ]
 
-        # For each row of rooms
-        for j in range(0, 2):
-
-            # For each column
-            for i in range(0, 2):
-                xL = i * room_w
-                yT = j * room_h
-                xR = xL + room_w
-                yB = yT + room_h
-
-                # Bottom wall and door
-                if i + 1 < 2:
-                    self.grid.vert_wall(xR, yT, room_h)
-                    pos = (xR, self._rand_int(yT + 1, yB))
-                    self.grid.set(*pos, None)
-
-                # Bottom wall and door
-                if j + 1 < 2:
-                    self.grid.horz_wall(xL, yB, room_w)
-                    pos = (self._rand_int(xL + 1, xR), yB)
-                    self.grid.set(*pos, None)
+        for w in walls:
+            self.grid.set(w[0], w[1], Wall())
 
         # Place the agents
         for a in range(self.num_agents):

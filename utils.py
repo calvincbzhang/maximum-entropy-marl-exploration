@@ -23,6 +23,24 @@ def grad_ent(pt):
     grad_p[grad_p > 100] = 1000
     return grad_p
 
+def geometric_weights(distributions, gamma=0.90):
+    N = len(distributions)
+    weights = [gamma**(N-i) for i in range(N)]
+    return weights
+
+def get_weights(distributions):
+    weights = np.ones(len(distributions))/float(len(distributions)) 
+    weights = geometric_weights(distributions)
+    weights = np.absolute(weights) / np.sum(weights)
+    print(weights)
+    print(weights.sum())
+    
+    if not np.isclose(weights.sum(), 1, rtol=1e-8):
+        weights /= weights.sum()
+        print('re-normalizing: %f' % weights.sum())
+    
+    return weights
+
 def compute_entropy_upper_bound(env):
     # count non-walls in grid
     num_states = 0
@@ -127,7 +145,7 @@ def learn_policy(env, train_steps, horizon, policy, reward_fn, optimizers, gamma
     num_agents = env.num_agents
 
     running_reward = np.array([0. for _ in range(num_agents)])
-    running_loss = 0
+    running_loss = np.array([0. for _ in range(num_agents)])
 
     print(f"======== Learning Policy ========")
     logging.info(f"======== Learning Policy ========")
@@ -170,7 +188,6 @@ def learn_policy(env, train_steps, horizon, policy, reward_fn, optimizers, gamma
         # Compute reward-to-go
         R = np.zeros(shape=(num_agents))
 
-        policy_loss = []
         rtg = []
 
         for r in rewards[::-1]:
@@ -180,22 +197,26 @@ def learn_policy(env, train_steps, horizon, policy, reward_fn, optimizers, gamma
         rtg = torch.tensor(np.array(rtg))
         rtg = (rtg - rtg.mean()) / (rtg.std() + eps)
 
-        # Compute policy loss
-        for log_prob, reward in zip(saved_log_probs, rewards):
-            policy_loss.append(torch.stack([-log_prob[i] * reward[i] for i in range(num_agents)]))
+        joint_loss = np.array([0. for _ in range(num_agents)])
 
-        policy_loss = torch.stack(policy_loss).sum()
-
-        # Update policy
         for i in range(num_agents):
+
+            policy_loss = []
+
+            # Compute policy loss
+            for log_prob, reward in zip(saved_log_probs, rewards):
+                policy_loss.append((-log_prob[i]) * reward[i])
+
+            policy_loss = torch.stack(policy_loss).sum()
+
+            # Update policy
             optimizers[i].zero_grad()
-
-        policy_loss.backward()
-
-        for i in range(num_agents):
+            policy_loss.backward()
             optimizers[i].step()
 
-        running_loss = running_loss * 0.99 + policy_loss * 0.01
+            joint_loss[i] = policy_loss.item()
+
+        running_loss = running_loss * 0.99 + joint_loss * 0.01
 
         if e % 100 == 0:
             print(f"Step {e}/{train_steps} | Running Reward: {running_reward} | Running Loss: {running_loss}")
@@ -203,7 +224,7 @@ def learn_policy(env, train_steps, horizon, policy, reward_fn, optimizers, gamma
 
     return policy
 
-def execute_average_policy(env, horizon, policies, entropies, avg_rounds=10):
+def execute_average_policy(env, horizon, policies, weights, entropies, avg_rounds=10):
     """
     Function to execute the average policy over multiple rounds and calculate the average probability distribution and entropy.
 
@@ -223,6 +244,9 @@ def execute_average_policy(env, horizon, policies, entropies, avg_rounds=10):
     #     indices = np.argsort(entropies)[-10:]
     #     policies = [policies[i] for i in indices]
     #     entropies = [entropies[i] for i in indices]
+    #     weights = [weights[i] for i in indices]
+    #     # normalize weights
+    #     weights = [w / sum(weights) for w in weights]
 
     average_p = np.zeros(shape=(env.width, env.height))
     avg_entropy = 0
@@ -246,11 +270,11 @@ def execute_average_policy(env, horizon, policies, entropies, avg_rounds=10):
 
             obs = [torch.from_numpy(obs[i]).float().unsqueeze(0).to(device) for i in range(env.num_agents)]
 
-            for policy, entropy in zip(policies, entropies):
+            for policy, weight, entropy in zip(policies, weights, entropies):
                 prob = torch.stack([policy[i].get_probs(obs[i]) for i in range(env.num_agents)])
-                probs += (prob * entropy)
+                probs += (prob * weight)
 
-            probs /= (len(policies) * sum(entropies))
+            probs /= (len(policies) * sum(weights))
 
             # epsilon greedy
             # if np.random.uniform() < 0.1:
